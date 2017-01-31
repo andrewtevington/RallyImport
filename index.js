@@ -1,10 +1,7 @@
 function createUserStoriesAndTasks(api, companyList, portfolioItem) {
 	loopObjectKeys(companyList, function(index, company) {
-		
 		createObject(api, "hierarchicalrequirement", formatCompanyInfo(company, portfolioItem), function(userStory, error) {
-			
 			loopObjectKeys(company, function(key, val) {
-				
 				if (key.substr(0, 6).toLowerCase() === "custom" && val > 0) {
 					var taskData = {
 						Name: sanitizeKey(key).split("Hours")[0].trim(),
@@ -114,9 +111,7 @@ var portfolioItem = (process.argv[4] || "").trim();
 var companyFile = (process.argv[5] || "").trim();
 
 if (user && password && portfolioItem && companyFile) {
-	var rallyAPI = rally({ user: user, pass: password });
-	
 	getCompaniesFromFile(companyFile, function(companies) {
-		createUserStoriesAndTasks(rallyAPI, companies, portfolioItem);
+		createUserStoriesAndTasks(rally({ user: user, pass: password }), companies, portfolioItem);
 	});
 }
