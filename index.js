@@ -1,23 +1,14 @@
-function createUserStoriesAndTasks(api, companyList, portfolioItem) {
+function createUserStoriesAndTasks(rally, user, pass, companyList, portfolioItem) {
 	loopObjectKeys(companyList, function(index, company) {
-		createObject(api, "hierarchicalrequirement", formatCompanyInfo(company, portfolioItem), function(userStory, error) {
-			loopObjectKeys(company, function(key, val) {
-				if (key.substr(0, 6).toLowerCase() === "custom" && val > 0) {
-					var taskData = {
-						Name: sanitizeKey(key).split("Hours")[0].trim(),
-						Project: userStory.Object.Project,
-						WorkProduct: userStory.Object,
-						Estimate: val
-					};
-
-					createObject(api, "task", taskData);
-				}
-			});
+		createObject(rally, user, pass, "hierarchicalrequirement", formatCompanyInfo(company, portfolioItem), function(userStory, error) {
+			if (error) {
+				console.log("ERROR: " + company.CompanyKey);
+			}
 		});
 	});
 }
 
-function getCompaniesFromFile(companyFile, callback) {
+function getCompaniesFromFile(fs, companyFile, callback) {
 	var companies = [];
 	
 	fs.readFile(companyFile, "utf8", function(err, content) {
@@ -42,8 +33,8 @@ function getCompaniesFromFile(companyFile, callback) {
 	});
 }
 
-function createObject(api, type, data, callback) {
-	api.create(
+function createObject(rally, user, pass, type, data, callback) {
+	rally({ user: user, pass: pass }).create(
 		{
 			type: type,
 			data: data
@@ -80,6 +71,7 @@ function CompanyInfo(info) {
 function formatCompanyInfo(companyInfo, portfolioItem) {
 	var formatted = {};
 	
+	formatted.PlanEstimate = Math.round(companyInfo.EstimatedHours / 7 * 100) / 100;
 	formatted.PortfolioItem = portfolioItem;
 	formatted.Name = companyInfo.Company + " (" + companyInfo.CompanyKey + ")";
 	formatted.Description = "";
@@ -106,12 +98,25 @@ function sanitizeKey(key) {
 var fs = require("fs");
 var rally = require("rally");
 var user = process.argv[2] || "";
-var password = process.argv[3] || "";
+var pass = process.argv[3] || "";
 var portfolioItem = (process.argv[4] || "").trim();
 var companyFile = (process.argv[5] || "").trim();
 
-if (user && password && portfolioItem && companyFile) {
-	getCompaniesFromFile(companyFile, function(companies) {
-		createUserStoriesAndTasks(rally({ user: user, pass: password }), companies, portfolioItem);
+if (user && pass && portfolioItem && companyFile) {
+	getCompaniesFromFile(fs, companyFile, function(companies) {
+		var chunkSize = 20;
+		var delay = 10000;
+		var iterations = Math.ceil(companies.length / chunkSize);
+		
+		for (var i = 0; i < iterations; i++) {
+			var doWork = function(wait, start, end, callback) {
+				setTimeout(function() {
+					console.log(start, end);
+					createUserStoriesAndTasks(rally, user, pass, companies.slice(start, end), portfolioItem)
+				}, wait);
+			};
+			
+			doWork((i + 1) * delay, i * chunkSize, (i * chunkSize) + chunkSize);
+		}
 	});
 }
